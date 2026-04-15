@@ -1,0 +1,37 @@
+# Database backup configuration
+
+# Database connection
+DB_TYPE=pgsql                # pgsql, mariadb, mysql
+DB_HOST=your-db-host
+DB_PORT=5432
+DB_NAME=your-database        # single DB name or ALL
+DB_USER=your-db-user
+DB_PASS=your-db-password
+
+# S3 destination
+S3_BUCKET=your-bucket
+S3_PATH=backups
+S3_REGION=us-east-1
+
+# AWS credentials
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+
+# Compression: zstd, gzip, xz, none
+COMPRESSION=zstd
+
+# Retention: delete backups older than this (days, 0 = never)
+RETENTION_DAYS=30
+
+# Verification
+VERIFY_DAY=Saturday          # day name, ALL, or NONE
+VERIFY_MODE=docker           # docker or external
+
+# External test DB (only for VERIFY_MODE=external)
+# TEST_DB_HOST=
+# TEST_DB_PORT=
+# TEST_DB_USER=
+# TEST_DB_PASS=
+
+# Override docker image for verify container (auto-detected if empty)
+# TEST_DOCKER_IMAGE=

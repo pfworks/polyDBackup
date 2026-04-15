@@ -1,0 +1,2 @@
+# Don't commit the config — it contains credentials
+db-backup.conf

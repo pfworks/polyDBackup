@@ -1,0 +1,10 @@
+[Unit]
+Description=Database backup to S3 with snapshot verification
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/db-backup
+ExecStart=/usr/local/bin/docker-compose --profile backup run --rm db-backup
+TimeoutStartSec=14400

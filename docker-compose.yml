@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  db-backup:
+    build: .
+    container_name: db-backup
+    env_file: db-backup.conf
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    network_mode: host
+    profiles:
+      - backup
+
+  db-restore:
+    build: .
+    container_name: db-restore
+    env_file: db-backup.conf
+    entrypoint: db-restore
+    stdin_open: true
+    tty: true
+    profiles:
+      - restore
