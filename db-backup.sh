@@ -67,6 +67,7 @@ case "$DB_TYPE" in
         for snap in $(pgq postgres "SELECT datname FROM pg_database WHERE datname LIKE '%_snapshot';"); do
             [ -z "$snap" ] && continue
             log "  Dropping $snap"
+            pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$snap' AND pid <> pg_backend_pid();" >/dev/null
             pgq postgres "DROP DATABASE IF EXISTS $snap;" >/dev/null
         done
         ;;
@@ -365,7 +366,7 @@ else
         # Clean up snapshots before exiting
         for DB in $DB_LIST; do
             case "$DB_TYPE" in
-                pgsql)   pgq postgres "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
+                pgsql)   pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB}_snapshot' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true; pgq postgres "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
                 mysql|mariadb) myq "" "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
             esac
         done
@@ -377,7 +378,7 @@ fi
 log "Cleaning up snapshots..."
 for DB in $DB_LIST; do
     case "$DB_TYPE" in
-        pgsql)   pgq postgres "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
+        pgsql)   pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB}_snapshot' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true; pgq postgres "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
         mysql|mariadb) myq "" "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
     esac
 done
