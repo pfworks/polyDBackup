@@ -107,10 +107,10 @@ for DB in $DB_LIST; do
     log "  Calculating checksums..."
     case "$DB_TYPE" in
         pgsql)
-            pgq "$SNAP" "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;" | while IFS= read -r table; do
+            pgq "$SNAP" "SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY schemaname, tablename;" | while IFS='|' read -r schema table; do
                 [ -z "$table" ] && continue
-                cs=$(pgq "$SNAP" "SELECT md5(COALESCE(string_agg(md5(t::text), ''), '')) FROM (SELECT * FROM \"$table\" ORDER BY 1) t;")
-                echo "${DB}.${table}|${cs}"
+                cs=$(pgq "$SNAP" "SELECT md5(COALESCE(string_agg(md5(t::text), ''), '')) FROM (SELECT * FROM \"$schema\".\"$table\" ORDER BY 1) t;")
+                echo "${DB}.${schema}.${table}|${cs}"
             done >> "$CHECKSUM_FILE"
             ;;
         mysql|mariadb)
@@ -298,10 +298,10 @@ else
                 tpgq postgres "DROP DATABASE IF EXISTS $TEST_DB_NAME;" >/dev/null
                 tpgq postgres "CREATE DATABASE $TEST_DB_NAME;" >/dev/null
                 tpg -d "$TEST_DB_NAME" < "$TMPDIR/restore.sql" >/dev/null 2>&1
-                tpgq "$TEST_DB_NAME" "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;" | while IFS= read -r table; do
+                tpgq "$TEST_DB_NAME" "SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY schemaname, tablename;" | while IFS='|' read -r schema table; do
                     [ -z "$table" ] && continue
-                    cs=$(tpgq "$TEST_DB_NAME" "SELECT md5(COALESCE(string_agg(md5(t::text), ''), '')) FROM (SELECT * FROM \"$table\" ORDER BY 1) t;")
-                    echo "${DB}.${table}|${cs}"
+                    cs=$(tpgq "$TEST_DB_NAME" "SELECT md5(COALESCE(string_agg(md5(t::text), ''), '')) FROM (SELECT * FROM \"$schema\".\"$table\" ORDER BY 1) t;")
+                    echo "${DB}.${schema}.${table}|${cs}"
                 done > "$TMPDIR/restored_checksums.txt"
                 ;;
             mysql|mariadb)
