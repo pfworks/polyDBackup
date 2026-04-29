@@ -93,7 +93,7 @@ for DB in $DB_LIST; do
         pgsql)
             pgq postgres "DROP DATABASE IF EXISTS $SNAP;" >/dev/null
             pgq postgres "CREATE DATABASE $SNAP;" >/dev/null
-            PGPASSWORD="$DB_PASS" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB" | pg -d "$SNAP" >/dev/null 2>&1
+            PGPASSWORD="$DB_PASS" pg_dump --no-owner --no-acl -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$DB" | pg -d "$SNAP" >/dev/null 2>&1
             ;;
         mysql|mariadb)
             myq "" "DROP DATABASE IF EXISTS $SNAP;" >/dev/null
@@ -126,7 +126,7 @@ for DB in $DB_LIST; do
     log "  Dumping snapshot..."
     case "$DB_TYPE" in
         pgsql)
-            PGPASSWORD="$DB_PASS" pg_dump -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$SNAP" > "$DUMP_FILE"
+            PGPASSWORD="$DB_PASS" pg_dump --no-owner --no-acl -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" "$SNAP" > "$DUMP_FILE"
             ;;
         mysql|mariadb)
             mydump "$SNAP" > "$DUMP_FILE"
