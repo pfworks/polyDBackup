@@ -31,6 +31,7 @@ fi
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION="$S3_REGION"
 NOW=$(date +%Y%m%d-%H%M%S)
 TODAY=$(date +%A)
+SNAP_SUFFIX="${SNAP_SUFFIX:=_polydbackup}"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
@@ -63,10 +64,10 @@ encrypt_file() {
 discover_dbs() {
     case "$DB_TYPE" in
         pgsql)
-            pgq postgres "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres') AND datname NOT LIKE '%_snapshot' ORDER BY datname;"
+            pgq postgres "SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres') AND datname NOT LIKE '%${SNAP_SUFFIX}%' ORDER BY datname;"
             ;;
         mysql|mariadb)
-            myq "" "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','performance_schema','mysql','sys') AND schema_name NOT LIKE '%\_snapshot' ORDER BY schema_name;"
+            myq "" "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema','performance_schema','mysql','sys') AND schema_name NOT LIKE '%${SNAP_SUFFIX}%' ORDER BY schema_name;"
             ;;
     esac
 }
@@ -82,7 +83,7 @@ fi
 log "Cleaning up stale snapshots..."
 case "$DB_TYPE" in
     pgsql)
-        for snap in $(pgq postgres "SELECT datname FROM pg_database WHERE datname LIKE '%_snapshot';"); do
+        for snap in $(pgq postgres "SELECT datname FROM pg_database WHERE datname LIKE '%${SNAP_SUFFIX}%';"); do
             [ -z "$snap" ] && continue
             log "  Dropping $snap"
             pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$snap' AND pid <> pg_backend_pid();" >/dev/null
@@ -90,7 +91,7 @@ case "$DB_TYPE" in
         done
         ;;
     mysql|mariadb)
-        for snap in $(myq "" "SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE '%\_snapshot';"); do
+        for snap in $(myq "" "SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE '%${SNAP_SUFFIX}%';"); do
             [ -z "$snap" ] && continue
             log "  Dropping $snap"
             myq "" "DROP DATABASE IF EXISTS $snap;" >/dev/null
@@ -133,7 +134,7 @@ CHECKSUM_FILE="$TMPDIR/checksums.txt"
 > "$CHECKSUM_FILE"
 
 for DB in $DB_LIST; do
-    SNAP="${DB}_snapshot"
+    SNAP="${DB}${SNAP_SUFFIX}"
     log "=== $DB ==="
 
     # Create snapshot
@@ -305,11 +306,10 @@ else
 
     # Find latest snapshot backup per DB in S3
     for DB in $DB_LIST; do
-        SNAP="${DB}_snapshot"
-        BACKUP_FILE=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep "${SNAP}_" | grep -v '\.md5$' | grep -v '\.verified$' | sort | tail -1 | awk '{print $4}')
+        BACKUP_FILE=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep "${DB}${SNAP_SUFFIX}" | grep -v '\.md5$' | grep -v '\.verified$' | sort | tail -1 | awk '{print $4}')
 
         if [ -z "$BACKUP_FILE" ]; then
-            log "  ✗ No backup found for $SNAP"
+            log "  ✗ No backup found for $DB"
             TOTAL_DIFF=$((TOTAL_DIFF + 1))
             continue
         fi
@@ -417,8 +417,8 @@ else
         # Clean up snapshots before exiting
         for DB in $DB_LIST; do
             case "$DB_TYPE" in
-                pgsql)   pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB}_snapshot' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true; pgq postgres "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
-                mysql|mariadb) myq "" "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
+                pgsql)   pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB}${SNAP_SUFFIX}' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true; pgq postgres "DROP DATABASE IF EXISTS \"${DB}${SNAP_SUFFIX}\";" >/dev/null 2>&1 || true ;;
+                mysql|mariadb) myq "" "DROP DATABASE IF EXISTS \`${DB}${SNAP_SUFFIX}\`;" >/dev/null 2>&1 || true ;;
             esac
         done
         exit 1
@@ -429,8 +429,8 @@ fi
 log "Cleaning up snapshots..."
 for DB in $DB_LIST; do
     case "$DB_TYPE" in
-        pgsql)   pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB}_snapshot' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true; pgq postgres "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
-        mysql|mariadb) myq "" "DROP DATABASE IF EXISTS ${DB}_snapshot;" >/dev/null 2>&1 || true ;;
+        pgsql)   pgq postgres "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${DB}${SNAP_SUFFIX}' AND pid <> pg_backend_pid();" >/dev/null 2>&1 || true; pgq postgres "DROP DATABASE IF EXISTS \"${DB}${SNAP_SUFFIX}\";" >/dev/null 2>&1 || true ;;
+        mysql|mariadb) myq "" "DROP DATABASE IF EXISTS \`${DB}${SNAP_SUFFIX}\`;" >/dev/null 2>&1 || true ;;
     esac
 done
 
