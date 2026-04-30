@@ -20,6 +20,13 @@ fi
 : "${RETENTION_DAYS:=30}"
 : "${VERIFY_DAY:=Saturday}"
 : "${VERIFY_MODE:=docker}"
+: "${ENCRYPT_BACKUPS:=false}"
+: "${ENCRYPT_KEY:=}"
+: "${DUMP_GLOBALS:=false}"
+
+if [ "$ENCRYPT_BACKUPS" = "true" ] && [ -z "$ENCRYPT_KEY" ]; then
+    echo "ENCRYPT_BACKUPS=true but ENCRYPT_KEY is not set" >&2; exit 1
+fi
 
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION="$S3_REGION"
 NOW=$(date +%Y%m%d-%H%M%S)
@@ -40,6 +47,17 @@ myq() { my ${1:+"$1"} -sN -e "$2" 2>/dev/null; }
 mydump() { $MYSQLDUMP_CMD -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" "$@" 2>/dev/null; }
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
+
+encrypt_file() {
+    local f="$1"
+    if [ "$ENCRYPT_BACKUPS" = "true" ]; then
+        openssl enc -aes-256-cbc -salt -pbkdf2 -pass env:ENCRYPT_KEY -in "$f" -out "${f}.enc"
+        rm -f "$f"
+        echo "${f}.enc"
+    else
+        echo "$f"
+    fi
+}
 
 # --- Discover databases ---
 discover_dbs() {
@@ -79,6 +97,23 @@ case "$DB_TYPE" in
         done
         ;;
 esac
+
+# --- Dump global roles and grants (pgsql only) ---
+if [ "$DUMP_GLOBALS" = "true" ] && [ "$DB_TYPE" = "pgsql" ]; then
+    log "Dumping global roles and grants..."
+    GLOBALS_FILE="$TMPDIR/pgsql_globals_${DB_HOST}_${NOW}.sql"
+    PGPASSWORD="$DB_PASS" pg_dumpall --globals-only -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > "$GLOBALS_FILE"
+    case "$COMPRESSION" in
+        zstd) zstd -q --rm "$GLOBALS_FILE"; GLOBALS_FILE="${GLOBALS_FILE}.zst" ;;
+        gzip) gzip "$GLOBALS_FILE"; GLOBALS_FILE="${GLOBALS_FILE}.gz" ;;
+        xz)   xz "$GLOBALS_FILE"; GLOBALS_FILE="${GLOBALS_FILE}.xz" ;;
+    esac
+    GLOBALS_FILE=$(encrypt_file "$GLOBALS_FILE")
+    GLOBALS_BASENAME=$(basename "$GLOBALS_FILE")
+    log "  Uploading globals to s3://${S3_BUCKET}/${S3_PATH}/${GLOBALS_BASENAME}"
+    aws s3 cp "$GLOBALS_FILE" "s3://${S3_BUCKET}/${S3_PATH}/${GLOBALS_BASENAME}" --quiet
+    rm -f "$GLOBALS_FILE"
+fi
 
 # --- Create snapshots, checksum, dump, upload ---
 CHECKSUM_FILE="$TMPDIR/checksums.txt"
@@ -140,6 +175,9 @@ for DB in $DB_LIST; do
         gzip) gzip "$DUMP_FILE"; DUMP_FILE="${DUMP_FILE}.gz" ;;
         xz)   xz "$DUMP_FILE"; DUMP_FILE="${DUMP_FILE}.xz" ;;
     esac
+
+    # Encrypt
+    DUMP_FILE=$(encrypt_file "$DUMP_FILE")
 
     # Generate MD5
     BASENAME=$(basename "$DUMP_FILE")
