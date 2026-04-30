@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.8
+- Added GitHub Actions workflow to build and publish container images to GHCR on tagged releases
+- Images available at `ghcr.io/pfworks/polydbackup:<version>`
+- Added GPLv3 license
+
 ## v1.0.7
 - Renamed snapshot databases from `<db>_snapshot` to `<db>_polydbackup`
 - Snapshot suffix is configurable via `SNAP_SUFFIX` env var (defaults to `_polydbackup`)

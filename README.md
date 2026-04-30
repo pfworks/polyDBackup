@@ -162,7 +162,15 @@ sudo systemctl enable --now db-backup.timer
 
 ### Ansible Deployment
 
-polyDBackup includes an Ansible role (`polyDBackup`). The role clones this repo to the target host, builds the Docker image, templates the config, and sets up a systemd timer.
+polyDBackup includes an Ansible role (`polyDBackup`). The role pulls a pre-built image from GHCR, templates the config, and sets up a systemd timer.
+
+#### Container Image
+
+Pre-built images are published to GitHub Container Registry on every tagged release:
+
+```
+ghcr.io/pfworks/polydbackup:<version>
+```
 
 #### Playbooks
 
@@ -176,13 +184,11 @@ ansible-playbook mariadb-polyDBackup.yaml
 
 #### Updating to a new version
 
-The role pins to a git tag and does not auto-update. To deploy a new version:
+The role pins to a specific image tag. To deploy a new version:
 
 ```bash
-ansible-playbook postgres-polyDBackup.yaml -e polydbackup_git_version=v1.1.0 -e polydbackup_git_update=true
+ansible-playbook postgres-polyDBackup.yaml -e polydbackup_image=ghcr.io/pfworks/polydbackup:1.1.0
 ```
-
-After deploying, set `polydbackup_git_update` back to `false` to prevent unintended updates on subsequent runs.
 
 #### Ansible Variables
 
@@ -190,8 +196,7 @@ All role variables use the `polydbackup_` prefix. See `roles/polyDBackup/default
 
 | Ansible Variable | Maps To | Default |
 |---|---|---|
-| `polydbackup_git_version` | Git tag/branch to clone | `v1.0.0` |
-| `polydbackup_git_update` | Whether to pull changes | `false` |
+| `polydbackup_image` | Container image to pull | `ghcr.io/pfworks/polydbackup:<version>` |
 | `polydbackup_type` | `DB_TYPE` | — (required) |
 | `polydbackup_db_name` | `DB_NAME` | — (required) |
 | `polydbackup_db_host` | `DB_HOST` | — (required) |
