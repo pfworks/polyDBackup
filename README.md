@@ -5,14 +5,14 @@ A containerized database backup tool that dumps PostgreSQL, MySQL, or MariaDB da
 ## How It Works
 
 1. **Globals** (optional, PostgreSQL only) — Dumps all roles, passwords, and grants via `pg_dumpall --globals-only`.
-2. **Snapshot** — For each target database, a `_snapshot` copy is created on the source server to get a consistent point-in-time view without locking the live database.
+2. **Snapshot** — For each target database, a temporary copy (suffixed with `_polydbackup` by default) is created on the source server to get a consistent point-in-time view without locking the live database.
 3. **Checksum** — Every table across all user schemas in the snapshot is checksummed (MD5 for PostgreSQL, `CHECKSUM TABLE` for MySQL/MariaDB).
 4. **Dump & Compress** — The snapshot is dumped to SQL, compressed, and an MD5 of the archive is generated.
 5. **Encrypt** (optional) — The compressed dump is encrypted with AES-256-CBC via OpenSSL.
 6. **Upload** — The compressed (and optionally encrypted) dump and its `.md5` sidecar are uploaded to S3.
 7. **Retention** — Backups older than `RETENTION_DAYS` are deleted from S3.
 8. **Verify** (optional, on a schedule) — The backup is downloaded, restored into a temporary Docker container (or external test server), and table checksums are compared against the originals. A `.verified` marker is written to S3 on success.
-9. **Cleanup** — All `_snapshot` databases are dropped.
+9. **Cleanup** — All temporary snapshot databases are dropped.
 
 ## Files
 
@@ -53,6 +53,7 @@ All variables are set in `db-backup.conf` (or passed as environment variables).
 | `S3_HOST` | — | Custom S3 endpoint hostname (sets `AWS_ENDPOINT_URL`) |
 | `COMPRESSION` | `zstd` | Compression algorithm: `zstd`, `gzip`, `xz`, or `none` |
 | `RETENTION_DAYS` | `30` | Delete S3 backups older than this many days. `0` = keep forever |
+| `SNAP_SUFFIX` | `_polydbackup` | Suffix appended to database names for temporary snapshots. Change to avoid conflicts |
 | `DUMP_GLOBALS` | `false` | Dump global roles and grants (`pg_dumpall --globals-only`). PostgreSQL only |
 | `ENCRYPT_BACKUPS` | `false` | Encrypt backups with AES-256-CBC via OpenSSL |
 | `ENCRYPT_KEY` | — | Encryption passphrase (required when `ENCRYPT_BACKUPS=true`) |
@@ -244,7 +245,8 @@ When running via Docker (the default), everything is included in the image. For 
 
 - The `docker.sock` is mounted read-only into the backup container so it can launch ephemeral verification containers on the host.
 - When `polydbackup_container_network_mode` is set to a named Docker network (e.g. `postgres-region-net`), the role automatically uses the `networks` key with `external: true` instead of `network_mode`. For `host`, `bridge`, or `none`, `network_mode` is used as-is.
-- Snapshot databases (`*_snapshot`) are cleaned up at the start and end of every run. Active connections to stale snapshots are terminated before dropping.
+- Snapshot databases (`*_polydbackup`) are cleaned up at the start and end of every run. Active connections to stale snapshots are terminated before dropping.
+- The snapshot suffix is configurable via the `SNAP_SUFFIX` environment variable (defaults to `_polydbackup`), avoiding conflicts with user databases.
 - PostgreSQL dumps use `--no-owner --no-acl` to avoid permission errors when the backup user is not a superuser.
 - Checksums cover all user schemas (not just `public`), using fully qualified `schema.table` references to work regardless of `search_path` settings (e.g. Patroni-managed instances).
 - On verification failure the script exits with code 1, making it easy to alert on in systemd or CI.

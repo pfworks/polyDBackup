@@ -26,6 +26,9 @@ COMPRESSION=zstd
 # Retention: delete backups older than this (days, 0 = never)
 RETENTION_DAYS=30
 
+# Snapshot suffix (appended to DB name for temporary snapshot databases)
+# SNAP_SUFFIX=_polydbackup
+
 # Dump global roles and grants (pgsql only): true or false
 DUMP_GLOBALS=false
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.7
+- Renamed snapshot databases from `<db>_snapshot` to `<db>_polydbackup`
+- Snapshot suffix is configurable via `SNAP_SUFFIX` env var (defaults to `_polydbackup`)
+- Prevents accidental cleanup of user databases that legitimately end in `_snapshot`
+- Updated all references: discovery, stale cleanup, snapshot creation, S3 search, and end-of-run cleanup
+
 ## v1.0.6
 - Added MariaDB support for global roles/grants dump (`DUMP_GLOBALS=true`)
   - Dumps users and `SHOW GRANTS` for each non-system user

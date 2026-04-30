@@ -33,7 +33,7 @@ if [ -n "${1:-}" ]; then
 else
     echo "Available backups in s3://${S3_BUCKET}/${S3_PATH}/:"
     echo ""
-    BACKUPS=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep -v '\.\(md5\|verified\)$' | grep '_snapshot_' | sort)
+    BACKUPS=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep -v '\.\(md5\|verified\)$' | grep "${SNAP_SUFFIX:=_polydbackup}" | sort)
     [ -z "$BACKUPS" ] && { echo "No backups found."; exit 1; }
 
     VERIFIED_LIST=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep '\.verified$' | awk '{print $4}' | sed 's/\.verified$//')
