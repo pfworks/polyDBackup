@@ -13,6 +13,9 @@ S3_BUCKET=your-bucket
 S3_PATH=backups
 S3_REGION=us-east-1
 
+# Custom S3 endpoint (optional, for non-AWS S3)
+# S3_HOST=https://s3.example.com
+
 # AWS credentials
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
@@ -22,6 +25,14 @@ COMPRESSION=zstd
 
 # Retention: delete backups older than this (days, 0 = never)
 RETENTION_DAYS=30
+
+# Dump global roles and grants (pgsql only): true or false
+DUMP_GLOBALS=false
+
+# Encryption: encrypt backups at rest with AES-256-CBC
+# Generate a key with: openssl rand -base64 32
+ENCRYPT_BACKUPS=false
+# ENCRYPT_KEY=your-encryption-key
 
 # Verification
 VERIFY_DAY=Saturday          # day name, ALL, or NONE
