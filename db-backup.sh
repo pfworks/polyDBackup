@@ -98,11 +98,24 @@ case "$DB_TYPE" in
         ;;
 esac
 
-# --- Dump global roles and grants (pgsql only) ---
-if [ "$DUMP_GLOBALS" = "true" ] && [ "$DB_TYPE" = "pgsql" ]; then
+# --- Dump global roles and grants ---
+if [ "$DUMP_GLOBALS" = "true" ]; then
     log "Dumping global roles and grants..."
-    GLOBALS_FILE="$TMPDIR/pgsql_globals_${DB_HOST}_${NOW}.sql"
-    PGPASSWORD="$DB_PASS" pg_dumpall --globals-only -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > "$GLOBALS_FILE"
+    GLOBALS_FILE="$TMPDIR/${DB_TYPE}_globals_${DB_HOST}_${NOW}.sql"
+    case "$DB_TYPE" in
+        pgsql)
+            PGPASSWORD="$DB_PASS" pg_dumpall --globals-only -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > "$GLOBALS_FILE"
+            ;;
+        mysql|mariadb)
+            mydump --no-data --no-create-info --no-create-db --all-databases --events --routines --triggers > "$GLOBALS_FILE" 2>/dev/null
+            # Append SHOW GRANTS for each user
+            myq "" "SELECT CONCAT('''',user,'''@''',host,'''') FROM mysql.user WHERE user NOT IN ('','root','mariadb.sys','mysql.sys');" | while IFS= read -r acct; do
+                [ -z "$acct" ] && continue
+                echo "-- Grants for $acct"
+                myq "" "SHOW GRANTS FOR $acct;" | sed 's/$/;/'
+            done >> "$GLOBALS_FILE"
+            ;;
+    esac
     case "$COMPRESSION" in
         zstd) zstd -q --rm "$GLOBALS_FILE"; GLOBALS_FILE="${GLOBALS_FILE}.zst" ;;
         gzip) gzip "$GLOBALS_FILE"; GLOBALS_FILE="${GLOBALS_FILE}.gz" ;;
