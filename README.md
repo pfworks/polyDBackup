@@ -203,7 +203,7 @@ All role variables use the `polydbackup_` prefix. See `roles/polyDBackup/default
 | `polydbackup_s3_secret_key` | `AWS_SECRET_ACCESS_KEY` | — (required) |
 | `polydbackup_s3_path` | `S3_PATH` | — (required) |
 | `polydbackup_s3_region` | `S3_REGION` | `{{ region }}` |
-| `polydbackup_s3_host` | `S3_HOST` / `AWS_ENDPOINT_URL` | `s3.{{ region }}.{{ spc_domain_external }}` |
+| `polydbackup_s3_host` | `S3_HOST` / `AWS_ENDPOINT_URL` | — (optional) |
 | `polydbackup_compression` | `COMPRESSION` | `zstd` |
 | `polydbackup_retention_days` | `RETENTION_DAYS` | `365` |
 | `polydbackup_dump_globals` | `DUMP_GLOBALS` | `false` |
