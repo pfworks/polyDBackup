@@ -127,6 +127,14 @@ zstd -d backup.sql.zst
 
 ## Usage
 
+### Container Image
+
+Pre-built images are published to GitHub Container Registry on every tagged release:
+
+```bash
+docker pull ghcr.io/pfworks/polydbackup:1.0.8
+```
+
 ### Standalone
 
 #### Run a backup
