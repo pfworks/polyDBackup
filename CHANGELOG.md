@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.11
+- Fixed MariaDB globals dump — `SHOW CREATE USER` is not supported on MariaDB
+- MariaDB now uses `mysqldump --system=users` for user creation statements
+- MySQL continues to use `SHOW CREATE USER`
+- Grants are dumped separately via `SHOW GRANTS` for both engines
+
 ## v1.0.10
 - Added `--globals` flag to restore script for downloading and decrypting globals backups without auto-restoring
 - Globals backups are not included in automated restore verification (file integrity via MD5 only)
