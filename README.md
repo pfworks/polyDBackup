@@ -248,13 +248,52 @@ The backup user needs the following privileges:
 -- Create and drop snapshot databases
 ALTER USER backup_user CREATEDB;
 
--- Read all data across all databases
+-- Read all data across all databases (PostgreSQL 14+)
 GRANT pg_read_all_data TO backup_user;
 ```
 
-### MySQL / MariaDB
+If `DUMP_GLOBALS=true`, the user also needs access to `pg_dumpall`:
 
-The backup user needs `SELECT`, `SHOW DATABASES`, `LOCK TABLES`, `RELOAD`, and `CREATE`/`DROP` privileges for snapshot databases.
+```sql
+-- Required for pg_dumpall --globals-only
+GRANT pg_read_all_settings TO backup_user;
+```
+
+### MySQL
+
+```sql
+-- Read and lock tables for dump
+GRANT SELECT, SHOW DATABASES, LOCK TABLES ON *.* TO 'backup_user'@'%';
+
+-- Create and drop snapshot databases (restricted to _polydbackup suffix)
+GRANT CREATE, DROP ON `%_polydbackup`.* TO 'backup_user'@'%';
+```
+
+If `DUMP_GLOBALS=true`, add:
+
+```sql
+-- Required for SHOW CREATE USER and SHOW GRANTS
+GRANT EVENT, TRIGGER ON *.* TO 'backup_user'@'%';
+```
+
+### MariaDB
+
+```sql
+-- Read and lock tables for dump
+GRANT SELECT, SHOW DATABASES, LOCK TABLES ON *.* TO 'backup_user'@'%';
+
+-- Create and drop snapshot databases (restricted to _polydbackup suffix)
+GRANT CREATE, DROP ON `%_polydbackup`.* TO 'backup_user'@'%';
+```
+
+If `DUMP_GLOBALS=true`, add:
+
+```sql
+-- Required for mysqldump --system=users and SHOW GRANTS
+GRANT EVENT, TRIGGER ON *.* TO 'backup_user'@'%';
+```
+
+Note: if you use a custom `SNAP_SUFFIX`, replace `_polydbackup` in the `GRANT` statements with your suffix.
 
 ## Requirements
 
