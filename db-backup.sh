@@ -108,13 +108,24 @@ if [ "$DUMP_GLOBALS" = "true" ]; then
             PGPASSWORD="$DB_PASS" pg_dumpall --globals-only -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" > "$GLOBALS_FILE"
             ;;
         mysql|mariadb)
-            mydump --no-data --no-create-info --no-create-db --all-databases --events --routines --triggers > "$GLOBALS_FILE" 2>/dev/null
-            # Append SHOW GRANTS for each user
+            # Dump users and grants
+            if [ "$DB_TYPE" = "mariadb" ]; then
+                mydump --system=users --no-create-db --no-data --no-create-info > "$GLOBALS_FILE" 2>/dev/null || true
+            else
+                myq "" "SELECT CONCAT('''',user,'''@''',host,'''') FROM mysql.user WHERE user NOT IN ('','root','mysql.sys');" | while IFS= read -r acct; do
+                    [ -z "$acct" ] && continue
+                    echo "-- User $acct"
+                    myq "" "SHOW CREATE USER $acct;" | sed 's/$/;/'
+                done > "$GLOBALS_FILE"
+            fi
+            # Append grants for each user
             myq "" "SELECT CONCAT('''',user,'''@''',host,'''') FROM mysql.user WHERE user NOT IN ('','root','mariadb.sys','mysql.sys');" | while IFS= read -r acct; do
                 [ -z "$acct" ] && continue
                 echo "-- Grants for $acct"
                 myq "" "SHOW GRANTS FOR $acct;" | sed 's/$/;/'
             done >> "$GLOBALS_FILE"
+            # Append events, routines, triggers
+            mydump --no-data --no-create-info --no-create-db --all-databases --events --routines --triggers >> "$GLOBALS_FILE" 2>/dev/null || true
             ;;
     esac
     case "$COMPRESSION" in
