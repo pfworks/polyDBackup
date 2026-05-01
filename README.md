@@ -156,8 +156,19 @@ docker-compose --profile restore run --rm db-restore
 ```
 
 Options:
+- `--globals` — download and decrypt a globals backup (roles/grants) without restoring. The file is saved locally for manual review and selective application
 - `--verified` — only show backups that passed verification
-- Positional args: `db-restore [--verified] [backup_file] [target_db_name]`
+- Positional args: `db-restore [--globals] [--verified] [backup_file] [target_db_name]`
+
+#### Restore globals
+
+```bash
+docker-compose --profile restore run --rm db-restore --globals
+```
+
+This lists available globals backups, downloads the selected one, decrypts and decompresses it, and saves the SQL file locally. Globals contain `CREATE ROLE` and `GRANT` statements that should be reviewed before applying — they are not automatically restored.
+
+Note: globals backups are not included in the automated restore verification. File integrity is ensured via MD5 checksums on S3.
 
 #### systemd (host-level scheduling)
 

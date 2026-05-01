@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Usage: db-restore [--verified] [backup_file] [target_db_name]
+# Usage: db-restore [--globals] [--verified] [backup_file] [target_db_name]
 
 CONF="${DB_BACKUP_CONF:-/etc/db-backup/db-backup.conf}"
 if [ -f "$CONF" ]; then
@@ -25,7 +25,64 @@ case "$DB_TYPE" in
 esac
 
 SHOW_VERIFIED_ONLY=false
+GLOBALS_MODE=false
+[ "${1:-}" = "--globals" ] && { GLOBALS_MODE=true; shift; }
 [ "${1:-}" = "--verified" ] && { SHOW_VERIFIED_ONLY=true; shift; }
+
+# --- Globals restore (download, decrypt, decompress only) ---
+if [ "$GLOBALS_MODE" = true ]; then
+    echo "Available globals backups in s3://${S3_BUCKET}/${S3_PATH}/:"
+    echo ""
+    BACKUPS=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep '_globals_' | grep -v '\.md5$' | sort)
+    [ -z "$BACKUPS" ] && { echo "No globals backups found."; exit 1; }
+
+    i=1
+    while IFS= read -r line; do
+        FILE=$(echo "$line" | awk '{print $4}')
+        SIZE=$(echo "$line" | awk '{print $3}')
+        echo "  ${i}) ${FILE}  ${SIZE}"
+        i=$((i + 1))
+    done <<< "$BACKUPS"
+
+    echo ""
+    read -p "Select backup number (or 'q' to quit): " SELECTION
+    [ "$SELECTION" = "q" ] && exit 0
+    GLOBALS_FILE=$(echo "$BACKUPS" | sed -n "${SELECTION}p" | awk '{print $4}')
+    [ -z "$GLOBALS_FILE" ] && { echo "Invalid selection."; exit 1; }
+
+    TMPDIR=$(mktemp -d)
+    trap 'rm -rf "$TMPDIR"' EXIT
+
+    echo "Downloading ${GLOBALS_FILE}..."
+    aws s3 cp "s3://${S3_BUCKET}/${S3_PATH}/${GLOBALS_FILE}" "$TMPDIR/${GLOBALS_FILE}"
+
+    OUTFILE="$TMPDIR/${GLOBALS_FILE}"
+
+    # Decrypt
+    if echo "$OUTFILE" | grep -q '\.enc$'; then
+        [ -z "${ENCRYPT_KEY:-}" ] && { echo "ENCRYPT_KEY required to decrypt."; exit 1; }
+        openssl enc -d -aes-256-cbc -salt -pbkdf2 -pass env:ENCRYPT_KEY -in "$OUTFILE" -out "${OUTFILE%.enc}"
+        OUTFILE="${OUTFILE%.enc}"
+    fi
+
+    # Decompress
+    case "$OUTFILE" in
+        *.zst) zstd -dq "$OUTFILE" -o "${OUTFILE%.zst}"; OUTFILE="${OUTFILE%.zst}" ;;
+        *.gz)  gunzip -c "$OUTFILE" > "${OUTFILE%.gz}"; OUTFILE="${OUTFILE%.gz}" ;;
+        *.xz)  unxz -c "$OUTFILE" > "${OUTFILE%.xz}"; OUTFILE="${OUTFILE%.xz}" ;;
+    esac
+
+    DEST="./$(basename "$OUTFILE")"
+    cp "$OUTFILE" "$DEST"
+    echo ""
+    echo "Globals saved to: ${DEST}"
+    echo "Review the file and apply manually, e.g.:"
+    case "$DB_TYPE" in
+        pgsql)       echo "  PGPASSWORD=\$DB_PASS psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d postgres < ${DEST}" ;;
+        mysql|mariadb) echo "  mysql -h $DB_HOST -P $DB_PORT -u $DB_USER -p < ${DEST}" ;;
+    esac
+    exit 0
+fi
 
 # --- Select backup ---
 if [ -n "${1:-}" ]; then

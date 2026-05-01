@@ -1,9 +1,16 @@
 # Changelog
 
+## v1.0.10
+- Added `--globals` flag to restore script for downloading and decrypting globals backups without auto-restoring
+- Globals backups are not included in automated restore verification (file integrity via MD5 only)
+
+## v1.0.9
+- Updated README with pre-built image documentation and docker pull instructions
+- Added GPLv3 license
+
 ## v1.0.8
 - Added GitHub Actions workflow to build and publish container images to GHCR on tagged releases
 - Images available at `ghcr.io/pfworks/polydbackup:<version>`
-- Added GPLv3 license
 
 ## v1.0.7
 - Renamed snapshot databases from `<db>_snapshot` to `<db>_polydbackup`
