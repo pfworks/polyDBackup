@@ -224,11 +224,37 @@ if [ "$RETENTION_DAYS" -gt 0 ]; then
     log "Cleaning up backups older than ${RETENTION_DAYS} days..."
     CUTOFF=$(date -d "-${RETENTION_DAYS} days" +%Y-%m-%d 2>/dev/null || date -v-${RETENTION_DAYS}d +%Y-%m-%d 2>/dev/null)
     if [ -n "$CUTOFF" ]; then
+        # Count globals and verified backups to ensure we keep at least 1 of each
+        GLOBALS_COUNT=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep '_globals_' | grep -v '\.md5$' | wc -l)
+        VERIFIED_COUNT=$(aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | grep '\.verified$' | wc -l)
+
         aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/" | while read -r line; do
             FILE_DATE=$(echo "$line" | awk '{print $1}')
             FILE_NAME=$(echo "$line" | awk '{print $4}')
             [ -z "$FILE_NAME" ] && continue
             if [[ "$FILE_DATE" < "$CUTOFF" ]]; then
+                # Keep at least 1 globals backup
+                if echo "$FILE_NAME" | grep -q '_globals_'; then
+                    if [ "$GLOBALS_COUNT" -le 1 ]; then
+                        log "  Keeping last globals backup: $FILE_NAME"
+                        continue
+                    fi
+                    GLOBALS_COUNT=$((GLOBALS_COUNT - 1))
+                fi
+                # Keep at least 1 verified backup (and its .verified marker)
+                if echo "$FILE_NAME" | grep -q '\.verified$'; then
+                    if [ "$VERIFIED_COUNT" -le 1 ]; then
+                        log "  Keeping last verified marker: $FILE_NAME"
+                        continue
+                    fi
+                    VERIFIED_COUNT=$((VERIFIED_COUNT - 1))
+                fi
+                # Don't delete a backup if it's the last verified one
+                VERIFIED_BASE="${FILE_NAME}.verified"
+                if aws s3 ls "s3://${S3_BUCKET}/${S3_PATH}/${VERIFIED_BASE}" >/dev/null 2>&1 && [ "$VERIFIED_COUNT" -le 1 ]; then
+                    log "  Keeping last verified backup: $FILE_NAME"
+                    continue
+                fi
                 aws s3 rm "s3://${S3_BUCKET}/${S3_PATH}/${FILE_NAME}" --quiet
             fi
         done
